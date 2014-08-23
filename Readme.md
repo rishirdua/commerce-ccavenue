@@ -23,7 +23,7 @@ Steps to use
 Contribute
 ----------
 - Issue Tracker: https://github.com/rishirdua/commerce-ccavenue/
-- Source Code: github.com/rishirdua/commerce-ccavenue
+- Source Code: https://github.com/rishirdua/commerce-ccavenue
 - Project page: http://rishirdua.github.io/commerce-ccavenue
 
 
