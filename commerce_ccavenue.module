@@ -1,0 +1,345 @@
+<?php
+/**
+ * @file
+ * CCavenue module for Drupal Commerce
+ */
+
+/**
+ * Administration forms form payment method.
+ */
+
+function ccavenue_settings_form($settings = NULL) {
+  $form = array();
+  $settings = (array) $settings + array(
+    'merchant_id' => '',
+    'working_key' => '',
+  );
+  $form['merchant_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Merchant id'),
+    '#default_value' => $settings['merchant_id'],
+  );
+  $form['working_key'] = array(
+    '#type' => 'textfield',
+    '#title' => t('CCavenue Working key'),
+    '#default_value' => $settings['working_key'],
+  );
+  return $form;
+}
+
+/**
+ * Register payment mehtod.
+ */
+function commerce_ccavenue_commerce_payment_method_info() {
+  $payment_methods = array();
+  $payment_methods['ccavenue'] = array(
+    'title' => t("CCavenue"),
+    'display_title' => "CCavenue",
+    'short_title' => 'CCavenue',
+    'description' => t("Payment method for CCavenue"),
+    'terminal' => FALSE,
+    'offsite' => TRUE,
+    'offsite_autoredirect' => TRUE,
+  );
+  return $payment_methods;
+}
+
+
+
+/**
+ * Ask for CCavenue redirect form.
+ */
+function ccavenue_redirect_form($form, &$form_state, $order, $payment_method) {
+  $wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $billing_address = $wrapper->commerce_customer_billing->commerce_customer_address->value();
+  // Get financial info.
+  $currency_code = $wrapper->commerce_order_total->currency_code->value();
+  $order_data = array(
+    'merchant_id' => $payment_method['settings']['merchant_id'],
+    'amount' => $wrapper->commerce_order_total->amount->value() / 100,
+    'order_id' => $order->order_id,
+    'redirect_url' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
+    'cancel_url' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
+    'language'=>'EN',
+    'currency'=>'INR',
+  );
+  $merchant_data = '';
+  foreach ($order_data as $key => $value){
+    $merchant_data.=$key.'='.$value.'&';
+  }
+
+
+  
+  $merchant_data.= 'billing_name='.$billing_address['name_line'].'&billing_address='.$billing_address['thoroughfare']. ' ' . $billing_address['premise'] . ' ' . $billing_address['sub_premise'].'&billing_country=India&billing_state='.$billing_address['administrative_area'].'&billing_city='.$billing_address['locality'].'&billing_zip='.$billing_address['postal_code'].'&billing_tel=1234567890&billing_email='.$order->mail.'&delivery_name='.$billing_address['name_line'].'&delivery_address='.$billing_address['thoroughfare']. ' ' . $billing_address['premise'] . ' ' . $billing_address['sub_premise'].'&delivery_country=India&delivery_state='.$billing_address['administrative_area'].'&delivery_city='.$billing_address['locality'].'&delivery_zip='.$billing_address['postal_code'].'&delivery_tel=1234567890';
+  $encrypted_data = _commerce_ccavenue_encrypt($merchant_data,$payment_method['settings']['working_key']);
+
+  $form['access_code'] = array(
+    '#type' => 'hidden',
+    '#value' => 'ReplaceThisWithYourAccessCode',
+  );
+
+  $form['encRequest'] = array(
+    '#type' => 'hidden',
+    '#value' => $encrypted_data,
+  );
+
+  $form['#action'] = 'https://secure.ccavenue.com/transaction/transaction.do?command=initiateTransaction';
+  return $form;
+}
+
+/**
+ * Implements hook_redirect_form_validate().
+ */
+function ccavenue_redirect_form_validate($order, $payment_method) {
+  
+  $encResponse = $_REQUEST["encResponse"];
+  //Decrypt data send by ccavenue
+  $workingKey = $payment_method['settings']['working_key'];
+  $rcvdString = _commerce_ccavenue_decrypt($encResponse, $workingKey);
+  $AuthDesc="";
+  $MerchantId="";
+  $OrderId="";
+  $Amount=0;
+  $Checksum=0;
+  $veriChecksum=false;
+	
+  $decryptValues=explode('&', $rcvdString);
+  $dataSize=sizeof($decryptValues);
+  for($i = 0; $i < $dataSize; $i++) { 
+	$information=explode('=',$decryptValues[$i]);
+	if($i==0)	$MerchantId=$information[1];	
+	if($i==1)	$OrderId=$information[1];
+	if($i==2)	$Amount=$information[1];	
+	if($i==3)	$AuthDesc=$information[1];
+	if($i==4)	$Checksum=$information[1];	
+	}
+  $rcvdString = $MerchantId.'|'.$OrderId.'|'.$Amount.'|'.$AuthDesc.'|'.$workingKey;
+  $checksum = _commerce_ccavenue_verify($rcvdString);
+  if($Checksum == $checksum) {
+    $checksum = 'true';
+	}
+  else {
+    $checksum = 'false';
+	}
+	
+  $message = t('Security error ip Address was: @ip', array('@ip' => ip_address()));
+  if ($checksum == 'true' && $AuthDesc == 'Y') {
+    commerce_ccavenue_transaction($order, $payment_method, $AuthDesc, $Amount);
+    return drupal_set_message(t('Thank you for shopping with us. Your account has been charged and your transaction is successful.'));
+    // Here you need to put in the routines for a successful.
+    // Transaction such as sending an email to customer.
+    // Setting database status, informing logistics etc etc.
+  }
+  elseif ($checksum == 'true' && $AuthDesc == 'B') {
+    commerce_ccavenue_transaction($order, $payment_method, $AuthDesc, $Amount);
+    return drupal_set_message(('Thank you for shopping with us.We will keep you posted regarding the status of your order through e-mail'));
+    // This is for payment American Express Card payment only.
+    // American Express authorisation status is available only after 5-6.
+  }
+  elseif ($checksum == 'true' && $AuthDesc == 'N') {
+    commerce_ccavenue_transaction($order, $payment_method, $AuthDesc, $Amount);
+    return drupal_set_message(t('Thank you for shopping with us.However,the transaction has been declined.'));
+    // Here you need to put in the routines for a failed.
+    // Transaction such as sending an email to customer.
+    // Setting database status etc etc.
+  }
+  else {
+    watchdog('commerce_ccavenue', $message, NULL, WATCHDOG_ERROR);
+    return drupal_set_message(t('Security Error. Illegal access detected. We will store your IP address.'), ERROR);
+  }
+}
+/**
+ * CCAvenue finish payment
+ */
+function commerce_ccavenue_transaction($order, $payment_method, $authdesc, $totlalAmount) {
+  /*echo "Payment Method: <br />";
+  print_r($payment_method);
+  echo "Order: <br />";
+  print_r($order);
+  exit();*/
+  $wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $currency = $wrapper->commerce_order_total->currency_code->value();
+  $amount = $wrapper->commerce_order_total->amount->value();
+  $transaction->instance_id = $payment_method['instance_id'];
+  $transaction->payment_method = 'ccavenue';
+  $transaction->amount = $totlalAmount;
+  $transaction->currency_code = $currency;
+  $transaction->remote_id = $order->order_id;
+  $transaction->message_variables = 'Join Films';
+  $transaction->payload = 'Joinfilms';
+  $transaction->uid = $order->uid;
+  $transaction->order_id = $order->order_id;
+  // Succeessful.
+  if($authdesc == "Y") {
+    $transaction->remote_status = t('Success');
+    $transaction->message = t('Payment received at') . ' ' . date("d-m-Y H:i:s", REQUEST_TIME);
+    $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+  }elseif($authdesc == "B"){
+    // Batch process - Pending orders.
+    $transaction->remote_status = t('Pending');
+    $transaction->message = t('Payment pending at') . ' ' . date("d-m-Y H:i:s", REQUEST_TIME);
+    $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
+  }elseif($authdesc == "N"){
+    // Failed transaction.
+    $transaction->remote_status = t('Failure');
+    $transaction->message = t('Payment failed at') . ' ' . date("d-m-Y H:i:s", REQUEST_TIME);
+    $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+  }
+  commerce_payment_transaction_save($transaction);
+}
+
+/**
+ * Get checksum.
+ */
+function _commerce_ccavenue_verify($rcvdString) {
+  return _commerce_ccavenue_verify_checksum($rcvdString);
+}
+/**
+ * Get checksum.
+ */
+function _commerce_ccavenue_getchecksum($MerchantId,$Amount,$OrderId ,$Redirect_URL,$WorkingKey) {
+ 
+  $str ="$MerchantId|$OrderId|$Amount|$Redirect_URL|$WorkingKey";
+  $adler = 1;
+  $adler = _commerce_ccavenue_adler32($adler, $str);
+  return $adler;
+}
+/**
+ * Verify checksum.
+ */
+function _commerce_ccavenue_verify_checksum($rcvdString) {
+  
+  $adler = 1;
+  $adler = _commerce_ccavenue_adler32($adler, $rcvdString);
+  return $adler;
+}
+/**
+ * Create helper function called _commerce_ccavenue_adler32.
+ */
+function _commerce_ccavenue_adler32($adler, $str) {
+  $base = 65521;
+  $s1   = $adler & 0xffff;
+  $s2   = ($adler >> 16) & 0xffff;
+  for ($i = 0; $i < strlen($str); $i++) {
+    $s1 = ($s1 + ord($str[$i])) % $base;
+    $s2 = ($s2 + $s1) % $base;
+  }
+  $myReturn = _commerce_ccavenue_leftshift($s2, 16) + $s1;
+  //return _commerce_ccavenue_leftshift($s2, 16) + $s1;
+  return $myReturn;
+}
+/**
+ * Create helper function called _commerce_ccavenue_leftshift.
+ */
+function _commerce_ccavenue_leftshift($str, $num) {
+  $str = DecBin($str);
+  for( $i = 0 ; $i < (64 - strlen($str)) ; $i++){
+	$str = "0".$str ;
+    }
+	
+  for($i = 0 ; $i < $num ; $i++){
+    $str = $str."0";
+	$str = substr($str , 1 ) ;
+	}
+  return _commerce_ccavenue_cdec($str);
+}
+/**
+ * Create helper function called _commerce_ccavenue_cdec.
+ */
+function _commerce_ccavenue_cdec($num) {
+  $dec = 0;
+  for ($n = 0 ; $n < strlen($num) ; $n++){
+    $temp = $num[$n] ;
+	$dec =  $dec + $temp*pow(2 , strlen($num) - $n - 1);
+	}
+  return $dec;
+  }
+  
+ /**
+ * Encrrption
+ */
+ 
+
+/*
+	This is an AES Encryption and Decryption Code (128 Bit) in PHP which is compatible with PHP 4 & PHP 5. 
+	In order to use the encrypt and decrypt methods a string and same key is required.
+
+	encrypt method: returns the encypted text.
+	decrypt mehtod: returns the plain text after decrypting.
+*/
+
+error_reporting(0);
+
+function _commerce_ccavenue_encrypt($plainText,$key)
+{
+  $secretKey = _commerce_ccavenue_hextobin(md5($key));
+  $initVector = pack("C*", 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f);
+
+  /* Open module and Create IV (Intialization Vector) */
+  $openMode = mcrypt_module_open(MCRYPT_RIJNDAEL_128, '','cbc', '');
+  $blockSize = mcrypt_get_block_size(MCRYPT_RIJNDAEL_128, 'cbc');
+  $plainPad = _commerce_ccavenue_pkcs5_pad($plainText, $blockSize);
+
+  /* Initialize encryption handle */
+  if (mcrypt_generic_init($openMode, $secretKey, $initVector) != -1) 
+  {  
+    /* Encrypt data */
+	$encryptedText = mcrypt_generic($openMode, $plainPad);
+	mcrypt_generic_deinit($openMode);
+    }
+
+  return bin2hex($encryptedText);
+  }
+
+function _commerce_ccavenue_decrypt($encryptedText,$key)
+{
+  $secretKey = _commerce_ccavenue_hextobin(md5($key));
+  $initVector = pack("C*", 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f);
+  $encryptedText= _commerce_ccavenue_hextobin($encryptedText);
+
+  /* Open module, and create IV */
+  $openMode = mcrypt_module_open(MCRYPT_RIJNDAEL_128, '','cbc', '');
+
+  mcrypt_generic_init($openMode, $secretKey, $initVector);
+  $decryptedText = mdecrypt_generic($openMode, $encryptedText);
+
+  // Drop nulls from end of string
+  $decryptedText = rtrim($decryptedText, "\0");
+
+  // Returns "Decrypted string: some text here"
+  mcrypt_generic_deinit($openMode);
+  return $decryptedText;
+}
+//*********** Padding Function *********************
+
+function _commerce_ccavenue_pkcs5_pad ($plainText, $blockSize)
+{
+  $pad = $blockSize - (strlen($plainText) % $blockSize);
+  return $plainText . str_repeat(chr($pad), $pad);
+  }
+
+//********** Hexadecimal to Binary function for php 4.0 version ********
+
+function _commerce_ccavenue_hextobin($hexString) 
+{ 
+  $length = strlen($hexString); 
+  $binString="";   
+  $count=0; 
+  while($count<$length){
+    $subString =substr($hexString,$count,2);           
+	$packedString = pack("H*",$subString); 
+	if ($count==0)
+	{
+	  $binString=$packedString;
+	  }
+	else 
+	{
+	  $binString.=$packedString;
+	  }
+			
+    $count+=2; 
+    } 
+  return $binString; 
+  } 
+?>
+
