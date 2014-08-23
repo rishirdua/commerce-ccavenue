@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="Commerce-ccavenue : Edited the module commerce_ccavenue to make it work with the new CCAvenue multi-currency processing payment gateway">
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Commerce-ccavenue</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/rishirdua/commerce-ccavenue">View on GitHub</a>
+
+          <h1 id="project_title">Commerce-ccavenue</h1>
+          <h2 id="project_tagline">Edited the module commerce_ccavenue to make it work with the new CCAvenue multi-currency processing payment gateway</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/rishirdua/commerce-ccavenue/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/rishirdua/commerce-ccavenue/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>
+<a name="commerce-ccavenue-payment-gateway-integration" class="anchor" href="#commerce-ccavenue-payment-gateway-integration"><span class="octicon octicon-link"></span></a>Commerce CCAvenue Payment Gateway Integration</h1>
+
+<p>Edited the module commerce_ccavenue to make it work with the new CCAvenue multi-currency processing payment gateway. Suggestions and patches are most welcome.</p>
+
+<h2>
+<a name="authors" class="anchor" href="#authors"><span class="octicon octicon-link"></span></a>Authors</h2>
+
+<p>Rishi Dua <a href="http://github.com/rishirdua">http://github.com/rishirdua</a>
+Vibhav Sinha <a href="https://github.com/vibhavsinha">https://github.com/vibhavsinha</a></p>
+
+<h2>
+<a name="steps-to-use" class="anchor" href="#steps-to-use"><span class="octicon octicon-link"></span></a>Steps to use</h2>
+
+<ul>
+<li>Install the Commerce CCAvenue (Tested on 7.x-1.2) <a href="https://www.drupal.org/project/commerce_ccavenue">https://www.drupal.org/project/commerce_ccavenue</a>
+</li>
+<li>Drop into your preferred modules directory</li>
+<li>Enable the module from admin/build/modules</li>
+<li>Goto admin/commerce/config/payment-methods and create a rule for CCAvenue</li>
+<li>Edit Action and Configure the Working Key &amp; Merchant ID. CCAvenue has replaced the working key with Access Code and Encryption Key. So enter Encryption Key in place of working key</li>
+<li>Download ccavenue.module from github.com/rishirdua/commerce-ccavenue/ and replace #value in $form['access_code'] with your Access Code.</li>
+<li>(Optional) Some fields are hard coded in the function ccavenue_redirect_form and should be changed if required. eg: language: EN, currency: INR, Phone number: 1234567890 etc.</li>
+<li>Replace the ccavenue.module file with the one in sites/all/modules/commerce_ccavenue</li>
+</ul><h2>
+<a name="contribute" class="anchor" href="#contribute"><span class="octicon octicon-link"></span></a>Contribute</h2>
+
+<ul>
+<li>Issue Tracker: <a href="https://github.com/rishirdua/commerce-ccavenue/">https://github.com/rishirdua/commerce-ccavenue/</a>
+</li>
+<li>Source Code: github.com/rishirdua/commerce-ccavenue</li>
+<li>Project page: <a href="http://rishirdua.github.io/commerce-ccavenue">http://rishirdua.github.io/commerce-ccavenue</a>
+</li>
+</ul><h2>
+<a name="licence" class="anchor" href="#licence"><span class="octicon octicon-link"></span></a>LICENCE:</h2>
+
+<p>Commerce CCAvenue Payment Gateway Integration
+Copyright (C) 2014, Rishi Dua <a href="mailto:rishirdua@gmail.com">rishirdua@gmail.com</a>, Vibhav Sinha <a href="mailto:vsinha@webdweb.in">vsinha@webdweb.in</a></p>
+
+<p>This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.</p>
+
+<p>This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.</p>
+
+<p>You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc.,
+51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.</p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Commerce-ccavenue maintained by <a href="https://github.com/rishirdua">rishirdua</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
